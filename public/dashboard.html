@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Vagas</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Painel de Controle de Vagas</h1>
+
+        <div class="form-container">
+            <h2>Cadastrar Nova Vaga</h2>
+            <form id="vagaForm">
+                <input type="text" id="empresa" placeholder="Empresa" required>
+                
+                <div class="funcao-container">
+                    <input type="text" id="funcao" list="funcoesList" placeholder="Função/Cargo" required>
+                    <datalist id="funcoesList"></datalist>
+                    <button type="button" id="addFuncaoBtn" style="display: none;">+ Adicionar</button>
+                </div>
+
+                <input type="text" id="contatos" placeholder="Contatos (Telefone, Site)">
+                <input type="text" id="endereco" placeholder="Endereço (Bairro, Cidade)">
+                <button type="submit">Salvar Vaga</button>
+            </form>
+        </div>
+
+        <hr>
+
+        <h2>Vagas Cadastradas</h2>
+        <table id="vagasTable">
+            <thead>
+                <tr>
+                    <th>Empresa</th>
+                    <th>Vaga</th>
+                    <th>Contatos</th>
+                    <th>Endereço</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- As vagas serão inseridas aqui via JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Proteção simples da página
+        if (sessionStorage.getItem('isLoggedIn') !== 'true') {
+            window.location.href = '/index.html';
+        }
+
+        const vagasTbody = document.querySelector('#vagasTable tbody');
+        const funcaoInput = document.getElementById('funcao');
+        const funcoesList = document.getElementById('funcoesList');
+        const addFuncaoBtn = document.getElementById('addFuncaoBtn');
+        let funcoesDisponiveis = []; // Array para guardar as funções existentes
+
+        // Função para carregar as vagas na tabela
+        async function carregarVagas() {
+            const response = await fetch('/api/vagas');
+            const vagas = await response.json();
+            vagasTbody.innerHTML = ''; // Limpa a tabela
+
+            vagas.forEach(vaga => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${vaga.empresa}</td>
+                    <td>${vaga.funcao}</td>
+                    <td>${vaga.contatos}</td>
+                    <td>${vaga.endereco}</td>
+                    <td>
+                        <label class="switch">
+                            <input type="checkbox" data-id="${vaga.id}" ${vaga.disponivel ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </td>
+                `;
+                vagasTbody.appendChild(tr);
+            });
+        }
+
+        // Função para carregar as funções no datalist
+        async function carregarFuncoes() {
+            const response = await fetch('/api/funcoes');
+            funcoesDisponiveis = await response.json();
+            
+            funcoesList.innerHTML = '';
+            funcoesDisponiveis.forEach(funcao => {
+                const option = document.createElement('option');
+                option.value = funcao.nome;
+                funcoesList.appendChild(option);
+            });
+        }
+        
+        // Lógica para o campo de Função
+        funcaoInput.addEventListener('input', () => {
+            const valorDigitado = funcaoInput.value.trim();
+            const existe = funcoesDisponiveis.some(f => f.nome.toLowerCase() === valorDigitado.toLowerCase());
+            
+            if (valorDigitado && !existe) {
+                addFuncaoBtn.style.display = 'inline-block';
+            } else {
+                addFuncaoBtn.style.display = 'none';
+            }
+        });
+
+        // Lógica para adicionar nova função
+        addFuncaoBtn.addEventListener('click', async () => {
+            const nomeFuncao = funcaoInput.value.trim();
+            if (!nomeFuncao) return;
+
+            const response = await fetch('/api/funcoes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome: nomeFuncao })
+            });
+
+            if (response.ok) {
+                alert(`Função "${nomeFuncao}" cadastrada com sucesso!`);
+                funcaoInput.value = nomeFuncao; // Mantém o valor
+                addFuncaoBtn.style.display = 'none';
+                await carregarFuncoes(); // Recarrega a lista
+            } else {
+                alert('Erro ao cadastrar função.');
+            }
+        });
+
+        // Lógica para salvar uma nova vaga
+        document.getElementById('vagaForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const nomeFuncao = document.getElementById('funcao').value;
+            // Encontrar o ID da função selecionada
+            const funcaoObj = funcoesDisponiveis.find(f => f.nome.toLowerCase() === nomeFuncao.toLowerCase());
+
+            if (!funcaoObj) {
+                alert('Função inválida. Por favor, cadastre a função antes de salvar a vaga.');
+                return;
+            }
+
+            const novaVaga = {
+                empresa: document.getElementById('empresa').value,
+                funcao_id: funcaoObj.id,
+                contatos: document.getElementById('contatos').value,
+                endereco: document.getElementById('endereco').value
+            };
+
+            await fetch('/api/vagas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(novaVaga)
+            });
+
+            document.getElementById('vagaForm').reset();
+            carregarVagas();
+        });
+
+        // Lógica para o toggle de status (disponível/indisponível)
+        vagasTbody.addEventListener('change', async (event) => {
+            if (event.target.type === 'checkbox') {
+                const id = event.target.dataset.id;
+                const disponivel = event.target.checked;
+
+                await fetch('/api/vagas', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, disponivel })
+                });
+            }
+        });
+
+        // Carregar dados iniciais ao abrir a página
+        carregarVagas();
+        carregarFuncoes();
+    </script>
+</body>
+</html>
