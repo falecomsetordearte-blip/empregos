@@ -7,12 +7,10 @@
     <link rel="stylesheet" href="style.css">
     
     <style>
-        /* CSS Inline para o Agendamento */
         .header-agendamento { text-align: center; margin-bottom: 30px; }
         .step-container { margin-bottom: 30px; }
         .step-title { font-size: 1.2em; color: #555; margin-bottom: 10px; font-weight: bold; }
         
-        /* Grid de botões */
         .dates-grid, .times-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); 
@@ -35,7 +33,6 @@
 
         .option-btn:hover { border-color: #007bff; color: #007bff; transform: translateY(-2px); }
         
-        /* Selecionado */
         .option-btn.selected {
             background-color: #007bff;
             color: white;
@@ -43,17 +40,17 @@
             box-shadow: 0 4px 10px rgba(0,123,255,0.3);
         }
 
-        /* Indisponível/Ocupado */
+        /* Estilo visual forte para Indisponível */
         .option-btn.disabled {
-            background-color: #f8f9fa;
-            color: #ccc;
-            border-color: #eee;
+            background-color: #e9ecef; /* Cinza mais escuro */
+            color: #999;
+            border-color: #dee2e6;
             cursor: not-allowed;
             text-decoration: line-through;
-            pointer-events: none; /* Impede clique */
+            pointer-events: none;
+            opacity: 0.7;
         }
 
-        /* Formulário */
         #formArea { display: none; background: #fff; padding: 25px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; box-shadow: 0 2px 15px rgba(0,0,0,0.05); }
         #resumoSelection { background: #eef2f7; color: #333; padding: 12px; margin-bottom: 20px; border-radius: 6px; font-weight: bold; text-align: center; border-left: 5px solid #007bff; }
         
@@ -72,17 +69,13 @@
         <!-- Passo 1: Dia (Fixo) -->
         <div class="step-container">
             <div class="step-title">1. Dia Disponível</div>
-            <div id="datasContainer" class="dates-grid">
-                <!-- Gerado via JS -->
-            </div>
+            <div id="datasContainer" class="dates-grid"></div>
         </div>
 
         <!-- Passo 2: Horários -->
         <div id="horariosStep" class="step-container hidden">
             <div class="step-title">2. Escolha o Horário</div>
-            <div id="horariosContainer" class="times-grid">
-                <!-- Gerado via JS -->
-            </div>
+            <div id="horariosContainer" class="times-grid"></div>
             <p id="msgSemHorario" class="error hidden">Todos os horários deste dia já foram preenchidos.</p>
         </div>
 
@@ -101,20 +94,18 @@
     </div>
 
     <script>
-        // --- CONFIGURAÇÃO MANUAL DA AGENDA ---
-        // Edite aqui para adicionar mais dias ou horários no futuro
+        // --- CONFIGURAÇÃO MANUAL ---
         const CONFIG_AGENDA = [
             {
-                data: '2025-02-02', // Formato YYYY-MM-DD
-                label: '02/02 - HOJE',
+                data: '2025-02-02',
+                label: '02/02 (Domingo)',
                 horarios: ['18:00', '18:20', '18:40', '19:00']
             }
         ];
 
-        // --- VARIÁVEIS DE CONTROLE ---
         let dataSelecionada = null; 
         let horarioSelecionado = null;
-        let agendamentosOcupados = []; // Lista do que vem do banco
+        let agendamentosOcupados = [];
 
         const datasContainer = document.getElementById('datasContainer');
         const horariosContainer = document.getElementById('horariosContainer');
@@ -128,22 +119,28 @@
             gerarBotoesDias();
         });
 
-        // 1. Busca agendamentos feitos no banco
+        // 1. Busca status do banco (COM CACHE BUSTING)
         async function carregarOcupados() {
             try {
-                const res = await fetch('/api/agendamentos');
-                const dados = await res.json();
-                // Guardamos as strings ISO originais para comparação
-                agendamentosOcupados = dados;
+                // Adicionamos ?t=Date.now() para forçar o navegador a não usar cache
+                const timestamp = Date.now();
+                const res = await fetch(`/api/agendamentos?t=${timestamp}`, {
+                    cache: "no-store", 
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+                
+                if (res.ok) {
+                    agendamentosOcupados = await res.json();
+                    console.log("Horários ocupados atualizados:", agendamentosOcupados);
+                }
             } catch (error) {
                 console.error("Erro ao carregar agenda:", error);
             }
         }
 
-        // 2. Cria o botão do dia fixo
+        // 2. Gera botões de dia
         function gerarBotoesDias() {
             datasContainer.innerHTML = '';
-
             CONFIG_AGENDA.forEach(item => {
                 const btn = document.createElement('div');
                 btn.className = 'option-btn';
@@ -153,9 +150,11 @@
             });
         }
 
-        // 3. Ao clicar no Dia
-        function selecionarDia(elementoBtn, configItem) {
-            // Estilo visual
+        // 3. Ao selecionar Dia
+        async function selecionarDia(elementoBtn, configItem) {
+            // Recarrega ocupados antes de mostrar os botões para ter certeza absoluta
+            await carregarOcupados();
+
             document.querySelectorAll('#datasContainer .option-btn').forEach(b => b.classList.remove('selected'));
             elementoBtn.classList.add('selected');
 
@@ -166,7 +165,7 @@
             gerarBotoesHorarios(configItem.horarios);
         }
 
-        // 4. Gera os horários verificando se já existe no banco
+        // 4. Gera botões de Horário
         function gerarBotoesHorarios(listaHorarios) {
             horariosStep.classList.remove('hidden');
             horariosContainer.innerHTML = '';
@@ -177,16 +176,15 @@
                 btn.className = 'option-btn';
                 btn.textContent = hora;
 
-                // Lógica de Bloqueio:
-                // Criamos a string ISO "falsa" (UTC) para comparar com o banco
-                // Formato: YYYY-MM-DDTHH:mm:00.000Z
+                // Cria ID único UTC: 2025-02-02T18:00:00.000Z
                 const idParaChecar = `${dataSelecionada}T${hora}:00.000Z`;
-
-                // Verifica se essa string exata existe no banco
+                
+                // Verifica na lista atualizada
                 const estaOcupado = agendamentosOcupados.includes(idParaChecar);
 
                 if (estaOcupado) {
                     btn.classList.add('disabled');
+                    btn.innerHTML = `${hora}<br><small>(Esgotado)</small>`;
                     btn.title = "Já reservado";
                 } else {
                     temDisponivel = true;
@@ -196,31 +194,27 @@
                 horariosContainer.appendChild(btn);
             });
 
-            const msgErro = document.getElementById('msgSemHorario');
-            if(!temDisponivel) msgErro.classList.remove('hidden');
-            else msgErro.classList.add('hidden');
+            if(!temDisponivel) {
+                document.getElementById('msgSemHorario').classList.remove('hidden');
+            } else {
+                document.getElementById('msgSemHorario').classList.add('hidden');
+            }
         }
 
-        // 5. Ao clicar no Horário
+        // 5. Selecionar Horário
         function selecionarHorario(elementoBtn, hora) {
             document.querySelectorAll('#horariosContainer .option-btn').forEach(b => b.classList.remove('selected'));
             elementoBtn.classList.add('selected');
-
             horarioSelecionado = hora;
             formArea.style.display = 'block';
-
-            // Texto de resumo
-            const [ano, mes, dia] = dataSelecionada.split('-');
-            document.getElementById('resumoSelection').innerText = 
-                `Agendando para: ${dia}/${mes} às ${hora}`;
             
-            // Rola a tela para o formulário (útil no celular)
-            setTimeout(() => {
-                formArea.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
+            const [ano, mes, dia] = dataSelecionada.split('-');
+            document.getElementById('resumoSelection').innerText = `Agendando para: ${dia}/${mes} às ${hora}`;
+            
+            setTimeout(() => formArea.scrollIntoView({ behavior: 'smooth' }), 100);
         }
 
-        // 6. Envio do Formulário
+        // 6. Enviar
         document.getElementById('bookingForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btnConfirmar');
@@ -228,11 +222,10 @@
             const whatsapp = document.getElementById('whatsapp').value;
 
             btn.disabled = true;
-            btn.textContent = "Processando...";
+            btn.textContent = "Verificando disponibilidade...";
             feedbackMessage.className = "";
             feedbackMessage.textContent = "";
 
-            // Monta a data final para salvar
             const dataHoraFinal = `${dataSelecionada}T${horarioSelecionado}:00.000Z`;
 
             try {
@@ -252,33 +245,27 @@
                     formArea.innerHTML = `
                         <div style="text-align: center; padding: 20px;">
                             <h2 style="color: #28a745;">Agendamento Confirmado!</h2>
-                            <p style="font-size: 1.1em; margin-top: 10px;">
-                                Parabéns, <strong>${nome}</strong>.
-                            </p>
-                            <p>Sua entrevista foi marcada para <strong>${dataSelecionada.split('-').reverse().join('/')} às ${horarioSelecionado}</strong>.</p>
+                            <p>Parabéns, <strong>${nome}</strong>.</p>
+                            <p>Dia ${dataSelecionada.split('-').reverse().join('/')} às ${horarioSelecionado}.</p>
                             <button onclick="window.location.reload()" style="margin-top:20px; padding: 10px 20px; cursor:pointer;">Voltar</button>
                         </div>
                     `;
-                    // Rola para o topo para ver a mensagem
                     formArea.scrollIntoView({ behavior: 'smooth' });
                 } else {
-                    feedbackMessage.className = "error";
-                    feedbackMessage.textContent = result.error || "Erro ao agendar.";
-                    btn.disabled = false;
-                    btn.textContent = "Tentar Novamente";
-                    
-                    // Se deu conflito (alguém pegou na frente), atualiza a tela
+                    // Erro 409 = Conflict (Já existe)
                     if (response.status === 409) {
-                        alert("Ops! Alguém acabou de reservar esse horário. A página será atualizada.");
-                        window.location.reload();
+                        alert("Sinto muito! Outra pessoa acabou de confirmar este horário segundos antes de você.");
+                        window.location.reload(); // Recarrega para mostrar o botão cinza
+                    } else {
+                        throw new Error(result.error || "Erro desconhecido");
                     }
                 }
             } catch (erro) {
                 console.error(erro);
                 feedbackMessage.className = "error";
-                feedbackMessage.textContent = "Erro de conexão. Verifique sua internet.";
+                feedbackMessage.textContent = "Erro ao agendar: " + erro.message;
                 btn.disabled = false;
-                btn.textContent = "Confirmar Agendamento";
+                btn.textContent = "Tentar Novamente";
             }
         });
     </script>
