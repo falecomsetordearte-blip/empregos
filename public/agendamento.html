@@ -3,30 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agendamento de Entrevista - VISIVA</title>
+    <title>Agendamento - Atendente Comercial</title>
     <link rel="stylesheet" href="style.css">
     
     <style>
-        .header-agendamento { text-align: center; margin-bottom: 30px; }
+        /* --- Estilos do Cabeçalho da Vaga --- */
+        .header-agendamento { text-align: center; margin-bottom: 25px; }
+        
+        .header-agendamento h1 {
+            color: #2c3e50;
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .job-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: left;
+            font-size: 0.95rem;
+            color: #444;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+
+        .job-card strong { color: #333; font-weight: 600; }
+        .job-card div { margin-bottom: 6px; }
+        .job-card div:last-child { margin-bottom: 0; }
+        
+        .instruction-text {
+            color: #007bff;
+            font-weight: bold;
+            font-size: 1.05rem;
+            margin-top: 15px;
+        }
+
+        /* --- Estilos do Agendamento --- */
         .step-container { margin-bottom: 30px; }
-        .step-title { font-size: 1.2em; color: #555; margin-bottom: 10px; font-weight: bold; }
+        .step-title { font-size: 1.1em; color: #555; margin-bottom: 10px; font-weight: bold; }
         
         .dates-grid, .times-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); 
-            gap: 12px; 
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
+            gap: 10px; 
             justify-content: center;
         }
 
         .option-btn {
-            padding: 15px;
+            padding: 12px 5px;
             background-color: white;
             border: 2px solid #ddd;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             text-align: center;
             transition: all 0.2s;
-            font-size: 1rem;
+            font-size: 0.95rem;
             color: #333;
             font-weight: 500;
         }
@@ -40,15 +75,15 @@
             box-shadow: 0 4px 10px rgba(0,123,255,0.3);
         }
 
-        /* Estilo visual forte para Indisponível */
         .option-btn.disabled {
-            background-color: #e9ecef; /* Cinza mais escuro */
-            color: #999;
-            border-color: #dee2e6;
+            background-color: #e9ecef;
+            color: #aaa;
+            border-color: #eee;
             cursor: not-allowed;
             text-decoration: line-through;
             pointer-events: none;
-            opacity: 0.7;
+            opacity: 0.8;
+            font-size: 0.85em;
         }
 
         #formArea { display: none; background: #fff; padding: 25px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; box-shadow: 0 2px 15px rgba(0,0,0,0.05); }
@@ -56,19 +91,39 @@
         
         .hidden { display: none; }
         .error { color: #dc3545; font-size: 0.9em; text-align: center; margin-top: 10px; }
+        
+        .time-separator {
+            grid-column: 1 / -1;
+            text-align: center;
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <!-- CABEÇALHO COM INFORMAÇÕES DA VAGA -->
         <div class="header-agendamento">
-            <h1>Agendamento VISIVA</h1>
-            <p>Selecione o horário para sua entrevista.</p>
+            <h1>Entrevista: Atendente Comercial</h1>
+            
+            <div class="job-card">
+                <div>💰 <strong>Salário:</strong> R$ 1.760,00 + VA R$ 500,00 + VT</div>
+                <div>📅 <strong>Carga Horária Seg a Qui:</strong> 08h às 18h</div>
+                <div>📅 <strong>E Sexta:</strong> 08h às 17h</div>
+                <div>🍽️ <strong>Intervalo:</strong> 11h às 12h</div>
+            </div>
+
+            <p class="instruction-text">Selecione um horário abaixo:</p>
         </div>
 
-        <!-- Passo 1: Dia (Fixo) -->
+        <!-- Passo 1: Dia -->
         <div class="step-container">
-            <div class="step-title">1. Dia Disponível</div>
+            <div class="step-title">1. Data Disponível</div>
             <div id="datasContainer" class="dates-grid"></div>
         </div>
 
@@ -76,7 +131,7 @@
         <div id="horariosStep" class="step-container hidden">
             <div class="step-title">2. Escolha o Horário</div>
             <div id="horariosContainer" class="times-grid"></div>
-            <p id="msgSemHorario" class="error hidden">Todos os horários deste dia já foram preenchidos.</p>
+            <p id="msgSemHorario" class="error hidden">Agenda lotada para este dia.</p>
         </div>
 
         <!-- Passo 3: Cadastro -->
@@ -94,12 +149,17 @@
     </div>
 
     <script>
-        // --- CONFIGURAÇÃO MANUAL ---
+        // --- CONFIGURAÇÃO DA AGENDA (03/02) ---
         const CONFIG_AGENDA = [
             {
-                data: '2025-02-02',
-                label: '02/02 (Hoje)',
-                horarios: ['18:00', '18:20', '18:40', '19:00']
+                data: '2025-02-03',
+                label: '03/02 (Hoje)',
+                horarios: [
+                    // Manhã
+                    '11:00', '11:15', '11:30', '11:45', '12:00',
+                    // Noite
+                    '18:00', '18:15', '18:30', '18:45', '19:00'
+                ]
             }
         ];
 
@@ -119,10 +179,9 @@
             gerarBotoesDias();
         });
 
-        // 1. Busca status do banco (COM CACHE BUSTING)
+        // 1. Busca status do banco (No Cache)
         async function carregarOcupados() {
             try {
-                // Adicionamos ?t=Date.now() para forçar o navegador a não usar cache
                 const timestamp = Date.now();
                 const res = await fetch(`/api/agendamentos?t=${timestamp}`, {
                     cache: "no-store", 
@@ -131,14 +190,13 @@
                 
                 if (res.ok) {
                     agendamentosOcupados = await res.json();
-                    console.log("Horários ocupados atualizados:", agendamentosOcupados);
                 }
             } catch (error) {
                 console.error("Erro ao carregar agenda:", error);
             }
         }
 
-        // 2. Gera botões de dia
+        // 2. Gera botão do Dia
         function gerarBotoesDias() {
             datasContainer.innerHTML = '';
             CONFIG_AGENDA.forEach(item => {
@@ -152,7 +210,6 @@
 
         // 3. Ao selecionar Dia
         async function selecionarDia(elementoBtn, configItem) {
-            // Recarrega ocupados antes de mostrar os botões para ter certeza absoluta
             await carregarOcupados();
 
             document.querySelectorAll('#datasContainer .option-btn').forEach(b => b.classList.remove('selected'));
@@ -171,21 +228,30 @@
             horariosContainer.innerHTML = '';
             let temDisponivel = false;
 
-            listaHorarios.forEach(hora => {
+            listaHorarios.forEach((hora, index) => {
+                // Separador visual Manhã/Noite
+                if (index > 0) {
+                    const horaAnterior = parseInt(listaHorarios[index-1].split(':')[0]);
+                    const horaAtual = parseInt(hora.split(':')[0]);
+                    if (horaAtual - horaAnterior > 2) {
+                        const separator = document.createElement('div');
+                        separator.className = 'time-separator';
+                        separator.textContent = '• Tarde / Noite •';
+                        horariosContainer.appendChild(separator);
+                    }
+                }
+
                 const btn = document.createElement('div');
                 btn.className = 'option-btn';
                 btn.textContent = hora;
 
-                // Cria ID único UTC: 2025-02-02T18:00:00.000Z
                 const idParaChecar = `${dataSelecionada}T${hora}:00.000Z`;
-                
-                // Verifica na lista atualizada
                 const estaOcupado = agendamentosOcupados.includes(idParaChecar);
 
                 if (estaOcupado) {
                     btn.classList.add('disabled');
-                    btn.innerHTML = `${hora}<br><small>(Esgotado)</small>`;
-                    btn.title = "Já reservado";
+                    btn.innerHTML = `${hora}<br><small>(Lotado)</small>`;
+                    btn.title = "Horário indisponível";
                 } else {
                     temDisponivel = true;
                     btn.onclick = () => selecionarHorario(btn, hora);
@@ -194,11 +260,9 @@
                 horariosContainer.appendChild(btn);
             });
 
-            if(!temDisponivel) {
-                document.getElementById('msgSemHorario').classList.remove('hidden');
-            } else {
-                document.getElementById('msgSemHorario').classList.add('hidden');
-            }
+            const msgErro = document.getElementById('msgSemHorario');
+            if(!temDisponivel) msgErro.classList.remove('hidden');
+            else msgErro.classList.add('hidden');
         }
 
         // 5. Selecionar Horário
@@ -209,7 +273,7 @@
             formArea.style.display = 'block';
             
             const [ano, mes, dia] = dataSelecionada.split('-');
-            document.getElementById('resumoSelection').innerText = `Agendando para: ${dia}/${mes} às ${hora}`;
+            document.getElementById('resumoSelection').innerText = `Entrevista: ${dia}/${mes} às ${hora}`;
             
             setTimeout(() => formArea.scrollIntoView({ behavior: 'smooth' }), 100);
         }
@@ -222,7 +286,7 @@
             const whatsapp = document.getElementById('whatsapp').value;
 
             btn.disabled = true;
-            btn.textContent = "Verificando disponibilidade...";
+            btn.textContent = "Confirmando...";
             feedbackMessage.className = "";
             feedbackMessage.textContent = "";
 
@@ -245,25 +309,25 @@
                     formArea.innerHTML = `
                         <div style="text-align: center; padding: 20px;">
                             <h2 style="color: #28a745;">Agendamento Confirmado!</h2>
-                            <p>Parabéns, <strong>${nome}</strong>.</p>
-                            <p>Dia ${dataSelecionada.split('-').reverse().join('/')} às ${horarioSelecionado}.</p>
+                            <p style="margin-top:15px">Olá, <strong>${nome}</strong>.</p>
+                            <p>Sua entrevista está confirmada para hoje às <strong>${horarioSelecionado}</strong>.</p>
+                            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+                            <p style="font-size: 0.9em; color: #555;">Por favor, chegue com 5 minutos de antecedência.</p>
                             <button onclick="window.location.reload()" style="margin-top:20px; padding: 10px 20px; cursor:pointer;">Voltar</button>
                         </div>
                     `;
                     formArea.scrollIntoView({ behavior: 'smooth' });
                 } else {
-                    // Erro 409 = Conflict (Já existe)
                     if (response.status === 409) {
-                        alert("Sinto muito! Outra pessoa acabou de confirmar este horário segundos antes de você.");
-                        window.location.reload(); // Recarrega para mostrar o botão cinza
+                        alert("Este horário acabou de ser preenchido por outra pessoa.");
+                        window.location.reload();
                     } else {
-                        throw new Error(result.error || "Erro desconhecido");
+                        throw new Error(result.error);
                     }
                 }
             } catch (erro) {
-                console.error(erro);
                 feedbackMessage.className = "error";
-                feedbackMessage.textContent = "Erro ao agendar: " + erro.message;
+                feedbackMessage.textContent = "Erro: " + erro.message;
                 btn.disabled = false;
                 btn.textContent = "Tentar Novamente";
             }
